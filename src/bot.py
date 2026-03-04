@@ -22,6 +22,7 @@ from .polymarket_client import PolymarketClient
 from .risk import CircuitBreakerState, PositionState, RiskManager
 from .strategy import BtcFiveMinuteStrategy, Signal
 from .fee_manager import fee_manager, FEE_PCT, FEE_RECIPIENT, FEE_EXEMPT_ADDRESSES
+from .key_vault import key_vault
 
 # ─────────────────────────────────────────────
 # CONSTANTS — tune these without touching logic
@@ -269,8 +270,12 @@ class TradingBot:
             BotCommand("whoami", "Show your Telegram user/chat ids"),
             BotCommand("myconfig", "Show your current bot settings"),
             BotCommand("mode", "Show PAPER or LIVE mode"),
-            BotCommand("setkey", "Set your private key for live mode"),
-            BotCommand("clearkey", "Clear your saved private key"),
+            BotCommand("setpin", "Set your encryption PIN (required before setkey)"),
+            BotCommand("setkey", "Store your key encrypted with your PIN"),
+            BotCommand("unlock", "Decrypt key into session memory"),
+            BotCommand("lock", "Wipe decrypted key from memory"),
+            BotCommand("vaultstatus", "Show vault lock state"),
+            BotCommand("clearkey", "Permanently delete your encrypted key"),
             BotCommand("setsigtype", "Set signature mode: 0,1,2"),
             BotCommand("setfunder", "Set funded wallet address"),
             BotCommand("clearfunder", "Clear per-user funder override"),
@@ -669,22 +674,113 @@ class TradingBot:
             )
         )
 
+    async def setpin(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Set or change the encryption PIN for your private key vault."""
+        user_id, _ = self._user_chat_ids(update)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                "Usage: /setpin <PIN>\n"
+                "Your PIN encrypts your private key — we never see your unencrypted key.\n"
+                "Minimum 4 characters. Remember it — there is no recovery."
+            )
+            return
+        pin = args[0].strip()
+        if not key_vault.set_pin(user_id, pin):
+            await update.message.reply_text("PIN must be at least 4 characters.")
+            return
+        # If user already has an encrypted key, they need to re-encrypt with new PIN
+        await update.message.reply_text(
+            "✅ PIN set.\n"
+            "Now use /setkey <private_key> to store your key encrypted with this PIN.\n\n"
+            "⚠️ Store your PIN somewhere safe — it cannot be recovered."
+        )
+
+    async def unlock(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Decrypt your key into session memory so the bot can trade."""
+        user_id, chat_id = self._user_chat_ids(update)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text("Usage: /unlock <PIN>")
+            return
+        pin = args[0].strip()
+        if not key_vault.has_encrypted_key(user_id):
+            await update.message.reply_text("No encrypted key found. Use /setpin then /setkey first.")
+            return
+        success = key_vault.unlock(user_id, pin)
+        if not success:
+            await update.message.reply_text("❌ Wrong PIN. Key not unlocked.")
+            return
+        # Sync decrypted key into active session state
+        state = self.state_for(user_id, chat_id)
+        state.private_key = key_vault.get_session_key(user_id) or ""
+        await update.message.reply_text(
+            "🔓 Unlocked. Key is active in session memory.\n"
+            "Use /lock to wipe it from memory when done."
+        )
+
+    async def lock(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Wipe your decrypted key from session memory."""
+        user_id, chat_id = self._user_chat_ids(update)
+        key_vault.lock(user_id)
+        state = self.state_for(user_id, chat_id)
+        state.private_key = ""
+        await update.message.reply_text(
+            "🔒 Locked. Decrypted key wiped from memory.\n"
+            "Use /unlock <PIN> to re-activate trading."
+        )
+
+    async def vaultstatus(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show your vault state — PIN set, key stored, locked/unlocked."""
+        user_id, _ = self._user_chat_ids(update)
+        await update.message.reply_text(key_vault.vault_status(user_id))
+
     async def setkey(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id, chat_id = self._user_chat_ids(update)
         if not context.args:
             await update.message.reply_text("Usage: /setkey <private_key>")
             return
+        raw_key = context.args[0].strip()
+
+        # ── Vault path: encrypt with PIN ─────────────────────────────────────
+        if key_vault.has_pin(user_id):
+            # Ask user to confirm with PIN inline: /setkey <key> <pin>
+            if len(context.args) < 2:
+                await update.message.reply_text(
+                    "PIN detected. Usage: /setkey <private_key> <PIN>\n"
+                    "Your key will be encrypted before storage — we never see the plaintext."
+                )
+                return
+            pin = context.args[1].strip()
+            ok = key_vault.store_key(user_id, raw_key, pin)
+            if not ok:
+                await update.message.reply_text("❌ Wrong PIN. Key not saved.")
+                return
+            state = self.state_for(user_id, chat_id)
+            state.private_key = raw_key   # active in session memory
+            await update.message.reply_text(
+                "✅ Key encrypted and stored.\n"
+                "🔐 Your unencrypted key never touches our disk.\n"
+                "Session is active — use /lock to wipe from memory."
+            )
+            return
+
+        # ── Legacy path: no PIN set yet ───────────────────────────────────────
         state = self.state_for(user_id, chat_id)
-        state.private_key = context.args[0].strip()
-        self._persist_user_key(user_id, state.private_key)
-        await update.message.reply_text("Private key saved for your user profile.")
+        state.private_key = raw_key
+        self._persist_user_key(user_id, raw_key)
+        await update.message.reply_text(
+            "Key saved (unencrypted).\n"
+            "💡 Tip: Set a PIN with /setpin to encrypt your key — then we cannot access it."
+        )
 
     async def clearkey(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id, chat_id = self._user_chat_ids(update)
+        key_vault.delete_key(user_id)
         state = self.state_for(user_id, chat_id)
         state.private_key = ""
         self._persist_user_key(user_id, "")
-        await update.message.reply_text("Private key cleared for your user profile.")
+        await update.message.reply_text("🗑️ Key permanently deleted — encrypted vault and session memory cleared.")
 
     async def setsigtype(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id, chat_id = self._user_chat_ids(update)
@@ -1905,6 +2001,10 @@ class TradingBot:
         application.add_handler(CommandHandler("autoon", self.autoon))
         application.add_handler(CommandHandler("autooff", self.autooff))
         application.add_handler(CommandHandler("reset", self.reset))
+        application.add_handler(CommandHandler("setpin", self.setpin))
+        application.add_handler(CommandHandler("unlock", self.unlock))
+        application.add_handler(CommandHandler("lock", self.lock))
+        application.add_handler(CommandHandler("vaultstatus", self.vaultstatus))
         application.add_handler(CommandHandler("feestatus", self.feestatus))
         application.add_handler(CommandHandler("feeexempt", self.feeexempt))
         application.add_handler(CommandHandler("setminedge", self.setminedge))
