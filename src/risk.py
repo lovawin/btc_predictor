@@ -1,7 +1,73 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+
+@dataclass
+class CircuitBreakerState:
+    """Prevents death-spiral trading by enforcing daily loss limits and cooldowns."""
+
+    daily_loss_usd: float = 0.0
+    consecutive_losses: int = 0
+    daily_wins: int = 0
+    daily_losses: int = 0
+    last_trade_date: str = ""
+    cooldown_until: str | None = None
+
+    # Limits
+    MAX_DAILY_LOSS_MULTIPLIER: float = 2.0   # e.g. 2× max_bet_usd
+    MAX_CONSECUTIVE_LOSSES: int = 3
+    COOLDOWN_MINUTES: int = 30
+
+    def check(self, max_bet_usd: float) -> str | None:
+        """Return a block reason string if trading is prohibited, else None."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Reset daily counters on a new UTC day
+        if self.last_trade_date != today:
+            self.daily_loss_usd = 0.0
+            self.consecutive_losses = 0
+            self.daily_wins = 0
+            self.daily_losses = 0
+            self.last_trade_date = today
+            self.cooldown_until = None
+
+        # Check active cooldown
+        if self.cooldown_until:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            if now_iso < self.cooldown_until:
+                return f"COOLDOWN: locked until {self.cooldown_until}"
+            self.cooldown_until = None  # cooldown expired
+
+        # Daily loss circuit breaker
+        max_daily_loss = max_bet_usd * self.MAX_DAILY_LOSS_MULTIPLIER
+        if self.daily_loss_usd >= max_daily_loss:
+            return (
+                f"CIRCUIT BREAKER: daily loss ${self.daily_loss_usd:.2f} "
+                f">= limit ${max_daily_loss:.2f}"
+            )
+
+        # Consecutive-loss circuit breaker — activate cooldown
+        if self.consecutive_losses >= self.MAX_CONSECUTIVE_LOSSES:
+            cooldown_end = datetime.now(timezone.utc) + timedelta(minutes=self.COOLDOWN_MINUTES)
+            self.cooldown_until = cooldown_end.isoformat()
+            return (
+                f"CIRCUIT BREAKER: {self.consecutive_losses} losses in a row. "
+                f"Cooldown for {self.COOLDOWN_MINUTES} min."
+            )
+
+        return None
+
+    def record_trade(self, pnl: float) -> None:
+        """Record the outcome of a closed trade."""
+        if pnl > 0:
+            self.daily_wins += 1
+            self.consecutive_losses = 0
+        elif pnl < 0:
+            self.daily_losses += 1
+            self.consecutive_losses += 1
+            self.daily_loss_usd += abs(pnl)
 
 
 @dataclass

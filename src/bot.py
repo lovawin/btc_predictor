@@ -19,7 +19,7 @@ from telegram.ext import (
 from .config import settings
 from .data_sources import MarketDataClient
 from .polymarket_client import PolymarketClient
-from .risk import PositionState, RiskManager
+from .risk import CircuitBreakerState, PositionState, RiskManager
 from .strategy import BtcFiveMinuteStrategy, Signal
 
 # ─────────────────────────────────────────────
@@ -57,21 +57,15 @@ class ChatState:
     volume_usd: float = 0.0
     last_message: str | None = None
 
-    # ── NEW FIELDS: death-spiral guards ───────────────────────────────────────
+    # ── Death-spiral guards ────────────────────────────────────────────────────
     # Total USD deployed into the currently active market_id
     exposure_in_current_market: float = 0.0
-    # Weighted-average TOKEN price we paid (0.0–1.0 scale, i.e. cents/100)
+    # Weighted-average TOKEN price we paid (0.0–1.0 scale)
     avg_token_price: float = 0.0
     # The market_id that owns the above counters (reset when market changes)
     _tracked_market_id: str = ""
-    # Daily circuit breaker state
-    daily_loss_usd: float = 0.0
-    daily_wins: int = 0
-    daily_losses: int = 0
-    daily_trades: int = 0
-    last_trade_date: str = ""  # YYYY-MM-DD
-    cooldown_until: str | None = None  # ISO timestamp
-    consecutive_losses: int = 0
+    # Circuit breaker — enforces daily loss limits and cooldowns
+    circuit_breaker: CircuitBreakerState = field(default_factory=CircuitBreakerState)
 
 
 class TradingBot:
@@ -1172,6 +1166,12 @@ class TradingBot:
         # ── CRITICAL: sync market counters whenever market_id may have changed ─
         self._sync_market_counters(state)
 
+        # ── Circuit breaker check ─────────────────────────────────────────────
+        cb_block = state.circuit_breaker.check(state.max_bet_usd)
+        if cb_block:
+            state.last_message = cb_block
+            return state.last_message
+
         snapshot = self.market.snapshot()
         signal = self.strategy.generate(snapshot)
         expected_edge = self._expected_edge_pct(signal)
@@ -1223,6 +1223,7 @@ class TradingBot:
                     current_spot=snapshot.fused_spot,
                     closed_size_usd=close_size,
                 )
+                state.circuit_breaker.record_trade(realized)
                 state.position.size_usd = round(max(0.0, state.position.size_usd - close_size), 2)
                 if state.position.size_usd == 0:
                     state.position.side = None
@@ -1270,6 +1271,7 @@ class TradingBot:
                     current_spot=snapshot.fused_spot,
                     closed_size_usd=close_size,
                 )
+                state.circuit_breaker.record_trade(realized)
                 state.position.size_usd = round(max(0.0, state.position.size_usd - close_size), 2)
                 if state.position.size_usd == 0:
                     state.position.side = None
@@ -1329,6 +1331,7 @@ class TradingBot:
                     current_spot=snapshot.fused_spot,
                     closed_size_usd=close_size,
                 )
+                state.circuit_breaker.record_trade(realized)
                 state.position.size_usd = round(max(0.0, state.position.size_usd - close_size), 2)
                 if state.position.size_usd == 0:
                     state.position.side = None
