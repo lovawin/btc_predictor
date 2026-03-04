@@ -739,8 +739,8 @@
         <div class="stat-label">Min Signal Confidence</div>
       </div>
       <div class="stat">
-        <div class="stat-num">100%</div>
-        <div class="stat-label">Non-Custodial</div>
+        <div class="stat-num">AES-256</div>
+        <div class="stat-label">Key Encryption</div>
       </div>
     </div>
   </div>
@@ -758,7 +758,7 @@
         <div class="step-num">01 —</div>
         <div class="step-icon">⚡</div>
         <h3>Connect Your Wallet</h3>
-        <p>Send your private key directly to the bot. It never leaves the server. Configure your wallet type and funded address in seconds.</p>
+        <p>Set a personal PIN with <code>/setpin</code>, then store your key with <code>/setkey</code>. Your key is encrypted with AES-256-GCM using your PIN before it ever touches storage. We physically cannot read it — only you can unlock it.</p>
       </div>
       <div class="step">
         <div class="step-num">02 —</div>
@@ -837,8 +837,20 @@
         <span class="cmd-desc">Begin your private session</span>
       </div>
       <div class="cmd-card">
+        <span class="cmd-tag">/setpin</span>
+        <span class="cmd-desc">Create your encryption PIN (do this first)</span>
+      </div>
+      <div class="cmd-card">
         <span class="cmd-tag">/setkey</span>
-        <span class="cmd-desc">Connect your wallet private key</span>
+        <span class="cmd-desc">Store your key encrypted with your PIN</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/unlock</span>
+        <span class="cmd-desc">Decrypt key into session memory</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/lock</span>
+        <span class="cmd-desc">Wipe decrypted key from memory</span>
       </div>
       <div class="cmd-card">
         <span class="cmd-tag">/setmax 20</span>
@@ -909,7 +921,8 @@
         Live on Polymarket
       </div>
       <h2>Ready to run it?</h2>
-      <p>Open the bot on Telegram, connect your wallet, set your risk, and let it trade. Support is live in the community.</p>
+      <p>Open the bot on Telegram, set your PIN, store your key encrypted, and let it trade. Support is live in the community.</p>
+      <p style="font-size:0.85rem;color:var(--muted);margin-top:-12px;margin-bottom:24px">🔐 Your private key is encrypted with AES-256-GCM using your personal PIN before storage. We cannot access it — only you can.</p>
       <div class="hero-buttons">
         <a href="https://t.me/btc_predictorTG" target="_blank" class="btn btn-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.069l-2.025 9.539c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.085 14.42l-2.95-.924c-.641-.203-.654-.641.136-.949l11.532-4.448c.537-.194 1.006.131.759.97z"/></svg>

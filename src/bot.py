@@ -443,50 +443,55 @@ class TradingBot:
         user_id, chat_id = self._user_chat_ids(update)
         self.state_for(user_id, chat_id)
         await update.message.reply_text(
-            "BTC 5m agent online for your user profile. Use /help for commands."
+            "⚡ BTC Predictor Bot\n"
+            "Automated BTC/USD prediction trading on Polymarket.\n\n"
+            "Quick setup:\n"
+            "1️⃣ /setpin <PIN> — create your encryption PIN\n"
+            "2️⃣ /setkey <private_key> <PIN> — store key encrypted\n"
+            "3️⃣ /setmax <usd> — set your max bet size\n"
+            "4️⃣ /starttrade — let it run\n\n"
+            "🔐 Your key is encrypted with your PIN before storage.\n"
+            "We never have access to your unencrypted key.\n\n"
+            "Type /help for the full command list or /keyhelp for key setup guide."
         )
 
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(
-            "\n".join(
-                [
-                    "Command Guide:",
-                    "/start - start your session",
-                    "/help - show this guide",
-                    "/whoami - show your id and chat id",
-                    "/myconfig - show your current settings",
-                    "/mode - show PAPER or LIVE mode",
-                    "/setkey <private_key> - set your live-trading key",
-                    "/clearkey - remove your saved key",
-                    "/setsigtype <0|1|2> - set signature mode (0=EOA,1=proxy,2=safe)",
-                    "/setfunder <0x...> - set funded wallet address",
-                    "/clearfunder - clear your funder override",
-                    "/setstops <take_profit%> <stop_loss%> - example: /setstops 60 15",
-                    "/setdca <block|allow> [loss%] - block/allow DCA, optional threshold",
-                    "/keyhelp - key safety and usage notes",
-                    "/setvpn <default|mx> - choose route preference",
-                    "/vpnon - enable VPN now (no params)",
-                    "/vpnoff - disable VPN route preference",
-                    "/vpnstatus - show your route status",
-                    "/setmax <usd> - set your max bet size",
-                    "/setmarket <market_id> - set market manually",
-                    "/setmarketurl <url> - extract and set market id from URL",
-                    "/tradecurrent <market_id> - pin market and start auto mode",
-                    "/starttrade [market_id] - start background trading",
-                    "/stoptrade - stop background trading",
-                    "/alltradeson - trade every cycle (high risk)",
-                    "/alltradesoff - return to normal profit filter",
-                    "/markethelp - explain market id usage",
-                    "/status - latest signal and open position",
-                    "/pnl - your private PnL and trade stats (DM only)",
-                    "/dryrunlive [market_id] [yes|no] [usd] - validate live route without placing orders",
-                    "/walletcheck - show signer, sig type, funder, balance and allowance",
-                    "/runonce - run one cycle now",
-                    "/autoon - enable fast auto loop",
-                    "/autooff - disable auto loop",
-                    "/reset - clear your local session data",
-                ]
-            )
+            "BTC Predictor Bot — Command Guide\n\n"
+            "🔐 KEY VAULT (setup first)\n"
+            "/setpin <PIN> — create your encryption PIN\n"
+            "/setkey <key> <PIN> — store key encrypted with your PIN\n"
+            "/unlock <PIN> — load key into session memory\n"
+            "/lock — wipe key from session memory\n"
+            "/vaultstatus — show vault state\n"
+            "/clearkey — permanently delete your key\n"
+            "/keyhelp — full key setup walkthrough\n\n"
+            "⚙️ CONFIGURATION\n"
+            "/setmax <usd> — max bet size\n"
+            "/setstops <tp%> <sl%> — take profit / stop loss\n"
+            "/setminconf <0-100> — min confidence to enter\n"
+            "/setminedge <pct> — min net expected edge\n"
+            "/setresolvebuf <sec> — skip entry if slot ending soon\n"
+            "/settrendlock <pct> — block trades against macro trend\n"
+            "/setdca <block|allow> [loss%] — DCA guard\n"
+            "/setcb <mult> <consec> <cooldown> — circuit breaker\n"
+            "/myconfig — show all current settings\n\n"
+            "💹 TRADING\n"
+            "/starttrade — start auto trading loop\n"
+            "/stoptrade — pause auto trading\n"
+            "/runonce — run one manual cycle\n"
+            "/status — live signal, confidence & position\n"
+            "/pnl — your win/loss record and P&L\n"
+            "/cbstatus — circuit breaker state\n\n"
+            "🌐 WALLET & MARKET\n"
+            "/walletcheck — balance, allowance, signer info\n"
+            "/setfunder <0x...> — set funded wallet\n"
+            "/setsigtype <0|1|2> — signature mode\n"
+            "/setmarket <market_id> — pin a specific market\n"
+            "/setmarketurl <url> — set market from URL\n\n"
+            "/whoami — your Telegram user ID\n"
+            "/mode — PAPER or LIVE mode\n"
+            "/reset — clear session data\n"
         )
 
     async def whoami(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -501,9 +506,29 @@ class TradingBot:
             "\n".join(
                 [
                     f"Mode: {mode}",
-                    "Paper mode: no private key required (simulated orders).",
-                    "Live mode: each user must set a key with /setkey <private_key>.",
-                    "Your key is isolated per Telegram user and stored locally on this bot host.",
+                    "",
+                    "🔐 HOW KEY SECURITY WORKS",
+                    "Your private key is encrypted with AES-256-GCM using a key",
+                    "derived from your personal PIN (PBKDF2, 310,000 iterations).",
+                    "Only the encrypted blob is written to disk — never the raw key.",
+                    "Even with full server access, your key cannot be read without your PIN.",
+                    "",
+                    "SETUP (do this once):",
+                    "1. /setpin <PIN>          — choose any PIN, min 4 chars",
+                    "2. /setkey <key> <PIN>    — encrypts and stores your key",
+                    "   Done. Trading is active for this session.",
+                    "",
+                    "EACH SESSION AFTER RESTART:",
+                    "1. /unlock <PIN>          — decrypts key into memory",
+                    "2. /starttrade            — start the bot",
+                    "",
+                    "WHEN DONE:",
+                    "/lock                     — wipes decrypted key from memory",
+                    "/vaultstatus              — check current state",
+                    "/clearkey                 — permanently delete everything",
+                    "",
+                    "⚠️  There is no PIN recovery. Store it somewhere safe.",
+                    "Your key never leaves your device unencrypted.",
                     "Use /clearkey anytime to remove it.",
                 ]
             )
