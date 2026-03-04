@@ -25,7 +25,7 @@ from .strategy import BtcFiveMinuteStrategy, Signal
 # ─────────────────────────────────────────────
 # CONSTANTS — tune these without touching logic
 # ─────────────────────────────────────────────
-TOKEN_LOSS_DCA_BLOCK_PCT = 0.20  # block DCA if avg token price dropped >20% from our avg cost
+
 
 
 @dataclass
@@ -39,6 +39,9 @@ class ChatState:
     stop_loss_pct: float = 0.15
     block_dca_on_loss: bool = True
     dca_block_loss_pct: float = 0.05
+    min_confidence: float = 0.65        # skip entry if signal confidence < this
+    order_size_pct: float = 0.25        # per-order cap as fraction of max_bet_usd
+    token_dca_block_pct: float = 0.20   # block DCA if avg token dropped > this% from cost
     max_bet_usd: float = settings.default_max_bet_usd
     market_id: str = settings.polymarket_default_market_id
     market_slug_template: str = settings.polymarket_5m_slug_template
@@ -166,6 +169,24 @@ class TradingBot:
                     dca_block_loss_pct_f = 0.05
                 if dca_block_loss_pct_f <= 0:
                     dca_block_loss_pct_f = 0.05
+                try:
+                    min_confidence_f = float(value.get("min_confidence", 0.65))
+                except (TypeError, ValueError):
+                    min_confidence_f = 0.65
+                if not (0.50 <= min_confidence_f <= 0.95):
+                    min_confidence_f = 0.65
+                try:
+                    order_size_pct_f = float(value.get("order_size_pct", 0.25))
+                except (TypeError, ValueError):
+                    order_size_pct_f = 0.25
+                if not (0.01 <= order_size_pct_f <= 1.0):
+                    order_size_pct_f = 0.25
+                try:
+                    token_dca_block_pct_f = float(value.get("token_dca_block_pct", 0.20))
+                except (TypeError, ValueError):
+                    token_dca_block_pct_f = 0.20
+                if not (0.01 <= token_dca_block_pct_f <= 1.0):
+                    token_dca_block_pct_f = 0.20
                 loaded[user_id] = {
                     "signature_type": sig_type_int,
                     "funder": funder,
@@ -173,6 +194,9 @@ class TradingBot:
                     "stop_loss_pct": stop_loss_pct_f,
                     "block_dca_on_loss": block_dca_on_loss,
                     "dca_block_loss_pct": dca_block_loss_pct_f,
+                    "min_confidence": min_confidence_f,
+                    "order_size_pct": order_size_pct_f,
+                    "token_dca_block_pct": token_dca_block_pct_f,
                 }
             return loaded
         except Exception:
@@ -191,6 +215,9 @@ class TradingBot:
                     "stop_loss_pct": float(mode.get("stop_loss_pct", 0.15)),
                     "block_dca_on_loss": bool(mode.get("block_dca_on_loss", True)),
                     "dca_block_loss_pct": float(mode.get("dca_block_loss_pct", 0.05)),
+                    "min_confidence": float(mode.get("min_confidence", 0.65)),
+                    "order_size_pct": float(mode.get("order_size_pct", 0.25)),
+                    "token_dca_block_pct": float(mode.get("token_dca_block_pct", 0.20)),
                 }
                 for user_id, mode in self._stored_user_wallet_modes.items()
             }
@@ -208,6 +235,9 @@ class TradingBot:
         stop_loss_pct: float,
         block_dca_on_loss: bool,
         dca_block_loss_pct: float,
+        min_confidence: float = 0.65,
+        order_size_pct: float = 0.25,
+        token_dca_block_pct: float = 0.20,
     ) -> None:
         self._stored_user_wallet_modes[user_id] = {
             "signature_type": signature_type,
@@ -216,6 +246,9 @@ class TradingBot:
             "stop_loss_pct": float(stop_loss_pct),
             "block_dca_on_loss": bool(block_dca_on_loss),
             "dca_block_loss_pct": float(dca_block_loss_pct),
+            "min_confidence": float(min_confidence),
+            "order_size_pct": float(order_size_pct),
+            "token_dca_block_pct": float(token_dca_block_pct),
         }
         self._save_user_wallet_modes()
 
@@ -261,6 +294,11 @@ class TradingBot:
             BotCommand("autoon", "Enable fast auto loop"),
             BotCommand("autooff", "Disable the auto loop"),
             BotCommand("reset", "Reset your local session state"),
+            BotCommand("setminconf", "Min signal confidence to trade (50-95%)"),
+            BotCommand("setorderpct", "Per-order size as % of max_bet"),
+            BotCommand("settokendca", "DCA block: token drop % from avg cost"),
+            BotCommand("setcb", "Circuit breaker limits: mult consec cooldown"),
+            BotCommand("cbstatus", "Show live circuit breaker state"),
         ]
 
     async def register_command_menu(self, application: Application) -> None:
@@ -288,6 +326,18 @@ class TradingBot:
             dca_block_loss_pct = float(mode.get("dca_block_loss_pct", 0.05)) if isinstance(mode, dict) else 0.05
         except (TypeError, ValueError):
             dca_block_loss_pct = 0.05
+        try:
+            min_confidence = float(mode.get("min_confidence", 0.65)) if isinstance(mode, dict) else 0.65
+        except (TypeError, ValueError):
+            min_confidence = 0.65
+        try:
+            order_size_pct = float(mode.get("order_size_pct", 0.25)) if isinstance(mode, dict) else 0.25
+        except (TypeError, ValueError):
+            order_size_pct = 0.25
+        try:
+            token_dca_block_pct = float(mode.get("token_dca_block_pct", 0.20)) if isinstance(mode, dict) else 0.20
+        except (TypeError, ValueError):
+            token_dca_block_pct = 0.20
         if user_id not in self.chat_state:
             self.chat_state[user_id] = ChatState(
                 user_id=user_id,
@@ -299,6 +349,9 @@ class TradingBot:
                 stop_loss_pct=stop_loss_pct,
                 block_dca_on_loss=block_dca_on_loss,
                 dca_block_loss_pct=dca_block_loss_pct,
+                min_confidence=min_confidence,
+                order_size_pct=order_size_pct,
+                token_dca_block_pct=token_dca_block_pct,
             )
         else:
             self.chat_state[user_id].chat_id = chat_id
@@ -361,11 +414,11 @@ class TradingBot:
             and desired_side == state.position.side
         ):
             token_move = (current_token_price / state.avg_token_price) - 1.0
-            if token_move <= -TOKEN_LOSS_DCA_BLOCK_PCT:
+            if token_move <= -state.token_dca_block_pct:
                 return (
                     f"BLOCKED DCA: token price {current_token_price:.3f} is "
                     f"{token_move:.1%} vs avg cost {state.avg_token_price:.3f} "
-                    f"(threshold={-TOKEN_LOSS_DCA_BLOCK_PCT:.0%})."
+                    f"(threshold={-state.token_dca_block_pct:.0%})."
                 )
 
         return None  # all clear
@@ -461,6 +514,10 @@ class TradingBot:
                     f"Take profit: {state.take_profit_pct:.2%}",
                     f"Stop loss: {state.stop_loss_pct:.2%}",
                     f"DCA on loss: {'BLOCKED' if state.block_dca_on_loss else 'ALLOWED'} (threshold={state.dca_block_loss_pct:.2%})",
+                    f"Min confidence: {state.min_confidence:.0%}",
+                    f"Order size: {state.order_size_pct:.0%} of max_bet (cap=${state.max_bet_usd * state.order_size_pct:.2f})",
+                    f"Token DCA block: {state.token_dca_block_pct:.0%} drop from cost",
+                    f"Circuit breaker: daily_loss={state.circuit_breaker.MAX_DAILY_LOSS_MULTIPLIER}x max_bet, max_consec={state.circuit_breaker.MAX_CONSECUTIVE_LOSSES}, cooldown={state.circuit_breaker.COOLDOWN_MINUTES}min",
                     f"VPN route: {state.vpn_region}",
                     f"Auto: {'ON' if state.auto_enabled else 'OFF'}",
                     f"Trading enabled: {'ON' if state.trading_enabled else 'OFF'}",
@@ -1089,6 +1146,153 @@ class TradingBot:
             )
         )
 
+    async def setminconf(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /setminconf <pct>  e.g. /setminconf 65"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                f"Usage: /setminconf <pct>\n"
+                f"Example: /setminconf 65 → bot only trades when confidence ≥65%\n"
+                f"Range: 50–95\n"
+                f"Current: {state.min_confidence:.0%}"
+            )
+            return
+        try:
+            val = float(args[0])
+            if not (50 <= val <= 95):
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Value must be 50–95. Example: /setminconf 65")
+            return
+        state.min_confidence = val / 100.0
+        self._persist_user_wallet_mode(
+            user_id, state.polymarket_signature_type, state.polymarket_funder,
+            state.take_profit_pct, state.stop_loss_pct, state.block_dca_on_loss,
+            state.dca_block_loss_pct, state.min_confidence, state.order_size_pct,
+            state.token_dca_block_pct,
+        )
+        await update.message.reply_text(
+            f"Min confidence set to {state.min_confidence:.0%}.\n"
+            f"Bot will skip any signal below this threshold."
+        )
+
+    async def setorderpct(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /setorderpct <pct>  e.g. /setorderpct 25"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                f"Usage: /setorderpct <pct>\n"
+                f"Example: /setorderpct 25 → each order uses up to 25% of max_bet\n"
+                f"Range: 1–100\n"
+                f"Current: {state.order_size_pct:.0%} (cap=${state.max_bet_usd * state.order_size_pct:.2f})"
+            )
+            return
+        try:
+            val = float(args[0])
+            if not (1 <= val <= 100):
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Value must be 1–100. Example: /setorderpct 25")
+            return
+        state.order_size_pct = val / 100.0
+        self._persist_user_wallet_mode(
+            user_id, state.polymarket_signature_type, state.polymarket_funder,
+            state.take_profit_pct, state.stop_loss_pct, state.block_dca_on_loss,
+            state.dca_block_loss_pct, state.min_confidence, state.order_size_pct,
+            state.token_dca_block_pct,
+        )
+        await update.message.reply_text(
+            f"Order size set to {state.order_size_pct:.0%} of max_bet.\n"
+            f"With max_bet=${state.max_bet_usd:.2f}, each order is capped at ${state.max_bet_usd * state.order_size_pct:.2f}."
+        )
+
+    async def settokendca(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /settokendca <pct>  e.g. /settokendca 20"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                f"Usage: /settokendca <pct>\n"
+                f"Example: /settokendca 20 → block DCA if token dropped >20% from your avg cost\n"
+                f"Range: 1–99\n"
+                f"Current: {state.token_dca_block_pct:.0%}"
+            )
+            return
+        try:
+            val = float(args[0])
+            if not (1 <= val <= 99):
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Value must be 1–99. Example: /settokendca 20")
+            return
+        state.token_dca_block_pct = val / 100.0
+        self._persist_user_wallet_mode(
+            user_id, state.polymarket_signature_type, state.polymarket_funder,
+            state.take_profit_pct, state.stop_loss_pct, state.block_dca_on_loss,
+            state.dca_block_loss_pct, state.min_confidence, state.order_size_pct,
+            state.token_dca_block_pct,
+        )
+        await update.message.reply_text(f"Token DCA block set to {state.token_dca_block_pct:.0%} drop from avg cost.")
+
+    async def setcb(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /setcb <daily_loss_mult> <max_consec_losses> <cooldown_minutes>"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 3:
+            await update.message.reply_text(
+                f"Usage: /setcb <daily_mult> <max_consec> <cooldown_min>\n"
+                f"Example: /setcb 2 3 30\n"
+                f"  daily_mult: max daily loss = mult × max_bet\n"
+                f"  max_consec: consecutive losses before cooldown\n"
+                f"  cooldown_min: minutes to pause after hitting consec limit\n"
+                f"Current: {state.circuit_breaker.MAX_DAILY_LOSS_MULTIPLIER}x / "
+                f"{state.circuit_breaker.MAX_CONSECUTIVE_LOSSES} / "
+                f"{state.circuit_breaker.COOLDOWN_MINUTES}min"
+            )
+            return
+        try:
+            mult = float(args[0])
+            consec = int(args[1])
+            cooldown = int(args[2])
+            if mult <= 0 or consec < 1 or cooldown < 1:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Invalid. Example: /setcb 2 3 30")
+            return
+        state.circuit_breaker.MAX_DAILY_LOSS_MULTIPLIER = mult
+        state.circuit_breaker.MAX_CONSECUTIVE_LOSSES = consec
+        state.circuit_breaker.COOLDOWN_MINUTES = cooldown
+        await update.message.reply_text(
+            f"Circuit breaker updated:\n"
+            f"Daily loss limit: {mult}x max_bet (${state.max_bet_usd * mult:.2f})\n"
+            f"Max consecutive losses before cooldown: {consec}\n"
+            f"Cooldown duration: {cooldown} min"
+        )
+
+    async def cbstatus(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show live circuit breaker counters and limits."""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        cb = state.circuit_breaker
+        block = cb.check(state.max_bet_usd)
+        lines = [
+            "Circuit Breaker Status",
+            f"Status: {'🔴 BLOCKED — ' + block if block else '🟢 OPEN (trading allowed)'}",
+            f"Daily loss: ${cb.daily_loss_usd:.2f} / ${state.max_bet_usd * cb.MAX_DAILY_LOSS_MULTIPLIER:.2f} limit",
+            f"Consecutive losses: {cb.consecutive_losses} / {cb.MAX_CONSECUTIVE_LOSSES} max",
+            f"Today: {cb.daily_wins}W / {cb.daily_losses}L",
+            f"Cooldown until: {cb.cooldown_until or 'none'}",
+            f"Settings: {cb.MAX_DAILY_LOSS_MULTIPLIER}x daily, {cb.MAX_CONSECUTIVE_LOSSES} consec, {cb.COOLDOWN_MINUTES}min cooldown",
+            f"Use /setcb to adjust limits.",
+        ]
+        await update.message.reply_text("\n".join(lines))
+
     async def reset(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id, chat_id = self._user_chat_ids(update)
         self.chat_state[user_id] = ChatState(
@@ -1190,9 +1394,18 @@ class TradingBot:
             state.last_message = "Live mode requires your key: use /setkey <private_key>"
             return state.last_message
 
+        # ── Minimum confidence filter ─────────────────────────────────────────
+        if signal.confidence < state.min_confidence:
+            state.last_message = (
+                f"No trade: confidence {signal.confidence:.2%} < min threshold "
+                f"{state.min_confidence:.2%} | {signal.reason}"
+            )
+            return state.last_message
+
         desired_side = "YES" if signal.direction == "UP" else "NO"
-        per_order_cap = round(max(1.0, state.max_bet_usd * 0.04), 2)
-        size = min(self.risk.bet_size(state.max_bet_usd, signal.confidence), per_order_cap)
+        # per_order_cap: user-adjustable fraction of max_bet (default 25%)
+        per_order_cap = round(state.max_bet_usd * state.order_size_pct, 2)
+        size = max(0.01, min(self.risk.bet_size(state.max_bet_usd, signal.confidence), per_order_cap))
 
         position_move_pct = 0.0
         if state.position.side and state.position.size_usd > 0 and state.position.entry_price > 0:
@@ -1515,6 +1728,11 @@ class TradingBot:
         application.add_handler(CommandHandler("autoon", self.autoon))
         application.add_handler(CommandHandler("autooff", self.autooff))
         application.add_handler(CommandHandler("reset", self.reset))
+        application.add_handler(CommandHandler("setminconf", self.setminconf))
+        application.add_handler(CommandHandler("setorderpct", self.setorderpct))
+        application.add_handler(CommandHandler("settokendca", self.settokendca))
+        application.add_handler(CommandHandler("setcb", self.setcb))
+        application.add_handler(CommandHandler("cbstatus", self.cbstatus))
         first_run = max(1, min(5, settings.auto_loop_interval_sec))
         application.job_queue.run_repeating(
             self.auto_tick,
