@@ -1,0 +1,6 @@
+*.env
+config.py
+config.js
+*.secret
+__pycache__/
+patches/
