@@ -12,6 +12,8 @@ class Signal:
     confidence: float     # 0.50 – 0.95
     expected_move_pct: float
     reason: str
+    ret_1h: float = 0.0   # 1-hour BTC return (raw, signed)
+    ret_5h: float = 0.0   # 5-hour BTC return (raw, signed)
 
 
 class BtcFiveMinuteStrategy:
@@ -137,4 +139,6 @@ class BtcFiveMinuteStrategy:
             confidence=confidence,
             expected_move_pct=expected_move_pct,
             reason=reason,
+            ret_1h=ret_1h,
+            ret_5h=ret_5h,
         )

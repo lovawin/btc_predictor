@@ -42,6 +42,9 @@ class ChatState:
     min_confidence: float = 0.65        # skip entry if signal confidence < this
     order_size_pct: float = 0.25        # per-order cap as fraction of max_bet_usd
     token_dca_block_pct: float = 0.20   # block DCA if avg token dropped > this% from cost
+    min_edge_pct: float = 0.01          # skip entry if net expected edge < this (1%)
+    resolve_buffer_sec: int = 90        # skip NEW entries if < this many seconds left in the 5m slot
+    trend_lock_pct: float = 0.015       # block entries that fight a strong 5h trend (1.5%)
     max_bet_usd: float = settings.default_max_bet_usd
     market_id: str = settings.polymarket_default_market_id
     market_slug_template: str = settings.polymarket_5m_slug_template
@@ -294,6 +297,9 @@ class TradingBot:
             BotCommand("autoon", "Enable fast auto loop"),
             BotCommand("autooff", "Disable the auto loop"),
             BotCommand("reset", "Reset your local session state"),
+            BotCommand("setminedge", "Min net expected edge % to trade"),
+            BotCommand("setresolvebuf", "Skip entries if <N sec left in slot"),
+            BotCommand("settrendlock", "Block trades fighting strong 5h trend"),
             BotCommand("setminconf", "Min signal confidence to trade (50-95%)"),
             BotCommand("setorderpct", "Per-order size as % of max_bet"),
             BotCommand("settokendca", "DCA block: token drop % from avg cost"),
@@ -515,6 +521,9 @@ class TradingBot:
                     f"Stop loss: {state.stop_loss_pct:.2%}",
                     f"DCA on loss: {'BLOCKED' if state.block_dca_on_loss else 'ALLOWED'} (threshold={state.dca_block_loss_pct:.2%})",
                     f"Min confidence: {state.min_confidence:.0%}",
+                    f"Min edge: {state.min_edge_pct:.2%}",
+                    f"Resolve buffer: {state.resolve_buffer_sec}s (skip entry if <N sec left in slot)",
+                    f"Trend lock: {state.trend_lock_pct:.2%} (0=off)",
                     f"Order size: {state.order_size_pct:.0%} of max_bet (cap=${state.max_bet_usd * state.order_size_pct:.2f})",
                     f"Token DCA block: {state.token_dca_block_pct:.0%} drop from cost",
                     f"Circuit breaker: daily_loss={state.circuit_breaker.MAX_DAILY_LOSS_MULTIPLIER}x max_bet, max_consec={state.circuit_breaker.MAX_CONSECUTIVE_LOSSES}, cooldown={state.circuit_breaker.COOLDOWN_MINUTES}min",
@@ -1146,6 +1155,88 @@ class TradingBot:
             )
         )
 
+    async def setminedge(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /setminedge <pct>  e.g. /setminedge 1"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                f"Usage: /setminedge <pct>\n"
+                f"Example: /setminedge 1 → only trade when net expected edge ≥1%\n"
+                f"Range: 0–20\n"
+                f"Current: {state.min_edge_pct:.2%}"
+            )
+            return
+        try:
+            val = float(args[0])
+            if not (0 <= val <= 20):
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Value must be 0–20 (percent). Example: /setminedge 1")
+            return
+        state.min_edge_pct = val / 100.0
+        await update.message.reply_text(
+            f"Min edge set to {state.min_edge_pct:.2%}.\n"
+            f"Bot will skip signals where net expected return is below this."
+        )
+
+    async def setresolvebuf(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /setresolvebuf <seconds>  e.g. /setresolvebuf 90"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                f"Usage: /setresolvebuf <seconds>\n"
+                f"Example: /setresolvebuf 90 → skip new entries if <90s left in slot\n"
+                f"Range: 0–270\n"
+                f"Current: {state.resolve_buffer_sec}s"
+            )
+            return
+        try:
+            val = int(args[0])
+            if not (0 <= val <= 270):
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Value must be 0–270 (seconds). Example: /setresolvebuf 90")
+            return
+        state.resolve_buffer_sec = val
+        await update.message.reply_text(
+            f"Resolution buffer set to {val}s.\n"
+            f"Bot will skip new entries when <{val}s left in the 5-min slot."
+        )
+
+    async def settrendlock(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /settrendlock <pct>  e.g. /settrendlock 1.5"""
+        user_id, chat_id = self._user_chat_ids(update)
+        state = self.state_for(user_id, chat_id)
+        args = context.args or []
+        if len(args) != 1:
+            await update.message.reply_text(
+                f"Usage: /settrendlock <pct>\n"
+                f"Example: /settrendlock 1.5 → block trades that fight a 5h trend ≥1.5%\n"
+                f"Set to 0 to disable.\n"
+                f"Range: 0–10\n"
+                f"Current: {state.trend_lock_pct:.2%}"
+            )
+            return
+        try:
+            val = float(args[0])
+            if not (0 <= val <= 10):
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("Value must be 0–10 (percent). Example: /settrendlock 1.5")
+            return
+        state.trend_lock_pct = val / 100.0
+        msg = (
+            f"Trend lock set to {state.trend_lock_pct:.2%}.\n"
+            f"Bot will skip entries that fight a 5h BTC trend stronger than this."
+            if val > 0 else
+            "Trend lock disabled. Bot will trade in any trend direction."
+        )
+        await update.message.reply_text(msg)
+
     async def setminconf(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Usage: /setminconf <pct>  e.g. /setminconf 65"""
         user_id, chat_id = self._user_chat_ids(update)
@@ -1401,6 +1492,44 @@ class TradingBot:
                 f"{state.min_confidence:.2%} | {signal.reason}"
             )
             return state.last_message
+
+        # ── Edge filter — only enter when expected return justifies the cost ──
+        # (Exits / holds are allowed regardless of edge)
+        if net_expected_edge < state.min_edge_pct and not (state.position.side and state.position.size_usd > 0):
+            state.last_message = (
+                f"No trade: edge {net_expected_edge:.3%} < min {state.min_edge_pct:.3%} | "
+                f"conf={signal.confidence:.2%} move={signal.expected_move_pct:.3%}"
+            )
+            return state.last_message
+
+        # ── Market resolution timing — skip NEW entries near slot expiry ──────
+        # Each 5-min Polymarket slot ends at the next multiple of 300 seconds.
+        # Don't open a new position when there's less than resolve_buffer_sec left.
+        if not (state.position.side and state.position.size_usd > 0):
+            now_ts = int(datetime.now(timezone.utc).timestamp())
+            secs_left = ((now_ts // 300) + 1) * 300 - now_ts
+            if secs_left < state.resolve_buffer_sec:
+                state.last_message = (
+                    f"No trade: only {secs_left}s left in slot (buffer={state.resolve_buffer_sec}s). "
+                    f"Waiting for next 5m window."
+                )
+                return state.last_message
+
+        # ── Macro trend lock — don't fight a strong 5h trend ─────────────────
+        # If the 5h return strongly disagrees with the trade direction, skip it.
+        # We still allow exits / hedges to proceed (only blocks new entries).
+        if not (state.position.side and state.position.size_usd > 0):
+            trend_against = (
+                signal.direction == "UP"   and signal.ret_5h < -state.trend_lock_pct
+            ) or (
+                signal.direction == "DOWN" and signal.ret_5h >  state.trend_lock_pct
+            )
+            if trend_against:
+                state.last_message = (
+                    f"No trade: {signal.direction} signal fights 5h trend "
+                    f"(ret_5h={signal.ret_5h:.3%}, lock={state.trend_lock_pct:.3%})"
+                )
+                return state.last_message
 
         desired_side = "YES" if signal.direction == "UP" else "NO"
         # per_order_cap: user-adjustable fraction of max_bet (default 25%)
@@ -1728,6 +1857,9 @@ class TradingBot:
         application.add_handler(CommandHandler("autoon", self.autoon))
         application.add_handler(CommandHandler("autooff", self.autooff))
         application.add_handler(CommandHandler("reset", self.reset))
+        application.add_handler(CommandHandler("setminedge", self.setminedge))
+        application.add_handler(CommandHandler("setresolvebuf", self.setresolvebuf))
+        application.add_handler(CommandHandler("settrendlock", self.settrendlock))
         application.add_handler(CommandHandler("setminconf", self.setminconf))
         application.add_handler(CommandHandler("setorderpct", self.setorderpct))
         application.add_handler(CommandHandler("settokendca", self.settokendca))
