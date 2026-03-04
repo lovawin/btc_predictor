@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTC Predictor Bot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Montserrat', 'Roboto', sans-serif;
+      background: linear-gradient(120deg, #232526 0%, #00c6ff 100%);
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: rgba(255,255,255,0.08);
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+      padding: 48px 40px 40px 40px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    h1 {
+      text-align: center;
+      font-size: 3em;
+      margin-bottom: 0.3em;
+      color: #fff;
+      letter-spacing: 2px;
+      font-family: 'Montserrat', 'Roboto', sans-serif;
+      text-shadow: 0 2px 16px #00c6ff44;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 1.3em;
+      color: #e0e0e0;
+      margin-bottom: 2em;
+    }
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 32px;
+      justify-content: center;
+      margin-bottom: 2.5em;
+    }
+    .feature-card {
+      background: rgba(255,255,255,0.13);
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 200px;
+      box-shadow: 0 2px 12px rgba(0,198,255,0.10);
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 1px solid rgba(0,198,255,0.18);
+    }
+    .feature-card:hover {
+      transform: translateY(-8px) scale(1.05);
+      box-shadow: 0 8px 32px rgba(0,198,255,0.18);
+    }
+    .feature-icon {
+      font-size: 2.7em;
+      margin-bottom: 0.5em;
+      color: #00c6ff;
+      text-shadow: 0 2px 8px #00c6ff44;
+    }
+    .chart-section {
+      margin: 2em 0 2.5em 0;
+      background: rgba(255,255,255,0.13);
+      border-radius: 16px;
+      padding: 32px 24px;
+      box-shadow: 0 2px 12px rgba(0,198,255,0.10);
+      border: 1px solid rgba(0,198,255,0.18);
+    }
+    .chart-title {
+      text-align: center;
+      font-size: 1.4em;
+      color: #00c6ff;
+      margin-bottom: 1em;
+      font-family: 'Montserrat', 'Roboto', sans-serif;
+    }
+    .telegram-info {
+      background: rgba(255,255,255,0.13);
+      border-radius: 16px;
+      padding: 32px 24px;
+      box-shadow: 0 2px 12px rgba(0,198,255,0.10);
+      border: 1px solid rgba(0,198,255,0.18);
+      margin-top: 2em;
+      text-align: center;
+      font-size: 1.2em;
+      color: #fff;
+    }
+    .telegram-icon {
+      font-size: 2.2em;
+      color: #00c6ff;
+      margin-bottom: 0.5em;
+      display: block;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 3em;
+      color: #e0e0e0;
+      font-size: 1em;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>BTC Predictor Bot</h1>
+    <div class="subtitle">Automatically bets on the BTC prediction market (5 min up/down) with built-in VPN for seamless transactions.</div>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <div>Auto-Bets on BTC<br>Prediction Market</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⏱️</div>
+        <div>5-Minute Up/Down<br>Betting Cycles</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <div>Built-in VPN for<br>Seamless Transactions</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📈</div>
+        <div>Live Market Analysis</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div>Fast & Secure</div>
+      </div>
+    </div>
+    <div class="chart-section">
+      <div class="chart-title">Sample BTC Price Prediction</div>
+      <canvas id="btcChart" width="800" height="350"></canvas>
+    </div>
+    <div class="telegram-info">
+      <span class="telegram-icon">&#128241;</span>
+      <strong>Instructions & Support:</strong><br>
+      All usage instructions and bot support are provided via Telegram. Please check your Telegram for details.
+    </div>
+    <div class="footer">
+      &copy; 2026 BTC Predictor Bot &mdash; All rights reserved.
+    </div>
+  </div>
+  <script>
+    // Sample BTC price prediction data
+    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const actualPrices = [52000, 52500, 53000, 52800, 53500, 54000, 53800];
+    const predictedPrices = [52100, 52600, 53200, 52900, 53600, 54100, 53900];
+    const ctx = document.getElementById('btcChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Actual BTC Price',
+            data: actualPrices,
+            borderColor: '#00c6ff',
+            backgroundColor: 'rgba(0,198,255,0.18)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 5,
+            pointBackgroundColor: '#00c6ff',
+          },
+          {
+            label: 'Predicted BTC Price',
+            data: predictedPrices,
+            borderColor: '#ffb347',
+            backgroundColor: 'rgba(255,179,71,0.18)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 5,
+            pointBackgroundColor: '#ffb347',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            labels: {
+              color: '#fff',
+              font: { size: 17 }
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#fff', font: { size: 15 } },
+            grid: { color: 'rgba(255,255,255,0.08)' }
+          },
+          y: {
+            ticks: { color: '#fff', font: { size: 15 } },
+            grid: { color: 'rgba(255,255,255,0.08)' }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
