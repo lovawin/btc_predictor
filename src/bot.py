@@ -21,6 +21,7 @@ from .data_sources import MarketDataClient
 from .polymarket_client import PolymarketClient
 from .risk import CircuitBreakerState, PositionState, RiskManager
 from .strategy import BtcFiveMinuteStrategy, Signal
+from .fee_manager import fee_manager, FEE_PCT, FEE_RECIPIENT, FEE_EXEMPT_ADDRESSES
 
 # ─────────────────────────────────────────────
 # CONSTANTS — tune these without touching logic
@@ -1155,6 +1156,33 @@ class TradingBot:
             )
         )
 
+    async def feestatus(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show current fee config and exempt list."""
+        exempt_list = "\n".join(f"  • {a}" for a in sorted(FEE_EXEMPT_ADDRESSES)) or "  (none)"
+        await update.message.reply_text(
+            f"Protocol Fee Config\n"
+            f"Rate: {FEE_PCT:.1%} per trade\n"
+            f"Recipient: {FEE_RECIPIENT}\n"
+            f"Exempt addresses:\n{exempt_list}"
+        )
+
+    async def feeexempt(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Usage: /feeexempt add|remove <address>"""
+        args = context.args or []
+        if len(args) != 2 or args[0] not in ("add", "remove"):
+            await update.message.reply_text("Usage: /feeexempt add <address>\n       /feeexempt remove <address>")
+            return
+        action, addr = args[0], args[1].strip()
+        if not addr.startswith("0x") or len(addr) != 42:
+            await update.message.reply_text("Invalid address format. Must be 0x... (42 chars)")
+            return
+        if action == "add":
+            fee_manager.add_exempt(addr)
+            await update.message.reply_text(f"✅ {addr} added to fee exempt list.")
+        else:
+            fee_manager.remove_exempt(addr)
+            await update.message.reply_text(f"✅ {addr} removed from fee exempt list.")
+
     async def setminedge(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Usage: /setminedge <pct>  e.g. /setminedge 1"""
         user_id, chat_id = self._user_chat_ids(update)
@@ -1724,6 +1752,21 @@ class TradingBot:
             )
             return state.last_message
 
+        # ── Protocol fee — collect before placing entry order ─────────────────
+        fee_result = fee_manager.collect(
+            private_key=effective_key,
+            trade_usd=size,
+            proxy_url=proxy_url,
+        )
+        if not fee_result.ok and not fee_result.skipped:
+            from .fee_manager import FEE_SOFT_FAIL
+            if not FEE_SOFT_FAIL:
+                state.last_message = f"Trade blocked: fee collection failed — {fee_result.message}"
+                return state.last_message
+            # Soft-fail: log warning, proceed anyway
+            import logging as _logging
+            _logging.getLogger(__name__).warning("Fee soft-fail: %s", fee_result.message)
+
         # ── place the entry order ─────────────────────────────────────────────
         result = self.polymarket.place_order(
             private_key=effective_key,
@@ -1801,10 +1844,15 @@ class TradingBot:
             state.trades_executed += 1
             state.volume_usd += size
 
+        fee_note = (
+            f" | fee=${fee_result.fee_usd:.4f}" if (fee_result.ok and not fee_result.skipped)
+            else " | fee=exempt" if fee_result.skipped
+            else f" | fee=FAILED({fee_result.message[:30]})"
+        )
         state.last_message = (
             f"{market_update_note}{desired_side} ${size:.2f} @ {snapshot.fused_spot:.2f} | "
             f"conf={signal.confidence:.2%} | gross_edge={expected_edge:.3%} | "
-            f"net_edge={net_expected_edge:.3%} | "
+            f"net_edge={net_expected_edge:.3%}{fee_note} | "
             f"{result.message}"
         )
         return state.last_message
@@ -1857,6 +1905,8 @@ class TradingBot:
         application.add_handler(CommandHandler("autoon", self.autoon))
         application.add_handler(CommandHandler("autooff", self.autooff))
         application.add_handler(CommandHandler("reset", self.reset))
+        application.add_handler(CommandHandler("feestatus", self.feestatus))
+        application.add_handler(CommandHandler("feeexempt", self.feeexempt))
         application.add_handler(CommandHandler("setminedge", self.setminedge))
         application.add_handler(CommandHandler("setresolvebuf", self.setresolvebuf))
         application.add_handler(CommandHandler("settrendlock", self.settrendlock))
