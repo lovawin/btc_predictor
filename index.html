@@ -1,135 +1,949 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BTC Predictor Bot</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange: #f7931a;
+      --orange-glow: rgba(247,147,26,0.35);
+      --orange-dim: rgba(247,147,26,0.08);
+      --green: #00e676;
+      --green-dim: rgba(0,230,118,0.12);
+      --bg: #080a0f;
+      --bg2: #0d1117;
+      --bg3: #111722;
+      --border: rgba(255,255,255,0.06);
+      --text: #e8eaf0;
+      --muted: #636b7a;
+    }
+
+    html { scroll-behavior: smooth; }
+
     body {
-      font-family: 'Montserrat', 'Roboto', sans-serif;
-      background: #111;
-      color: #fff;
-      margin: 0;
-      padding: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      background: rgba(8,10,15,0.7);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--orange);
+      text-decoration: none;
+      letter-spacing: -0.5px;
+    }
+
+    .nav-logo .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .nav-links a:hover { color: var(--text); background: var(--border); }
+
+    .nav-links .cta {
+      color: var(--bg);
+      background: var(--orange);
+      border-color: var(--orange);
+      font-weight: 700;
+    }
+
+    .nav-links .cta:hover { background: #ffaa33; border-color: #ffaa33; }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(247,147,26,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-glow-2 {
+      position: absolute;
+      bottom: -100px;
+      right: -100px;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(0,230,118,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--orange-dim);
+      border: 1px solid rgba(247,147,26,0.25);
+      color: var(--orange);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 6px 16px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+    }
+
+    .badge .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    h1 {
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 900;
+      line-height: 1.08;
+      letter-spacing: -2px;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.6) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    h1 span {
+      background: linear-gradient(90deg, var(--orange), #ffcc44);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      color: var(--muted);
+      max-width: 560px;
+      line-height: 1.7;
+      margin-bottom: 48px;
+      font-weight: 400;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s;
+      letter-spacing: 0.2px;
+    }
+
+    .btn-primary {
+      background: var(--orange);
+      color: #000;
+      box-shadow: 0 0 40px var(--orange-glow);
+    }
+
+    .btn-primary:hover {
+      background: #ffaa33;
+      box-shadow: 0 0 60px rgba(247,147,26,0.5);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+      transform: translateY(-2px);
+    }
+
+    /* ── TICKER ── */
+    .ticker-wrap {
+      margin-top: 72px;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .ticker-wrap::before, .ticker-wrap::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 100px;
+      z-index: 2;
+    }
+
+    .ticker-wrap::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+    .ticker-wrap::after  { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+
+    .ticker {
+      display: flex;
+      gap: 48px;
+      animation: ticker 22s linear infinite;
+      width: max-content;
+    }
+
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .ticker-item .up { color: var(--green); }
+    .ticker-item .down { color: #ff5252; }
+    .ticker-sep { color: var(--border); }
+
+    /* ── SECTIONS ── */
+    section {
+      position: relative;
+      z-index: 1;
+      padding: 100px 24px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--orange);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      max-width: 540px;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2px;
+      margin-top: 64px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .step {
+      background: var(--bg2);
+      padding: 40px 32px;
+      position: relative;
+      transition: background 0.3s;
+    }
+
+    .step:hover { background: var(--bg3); }
+
+    .step-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--orange);
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+
+    .step-icon {
+      font-size: 2rem;
+      margin-bottom: 16px;
+    }
+
+    .step h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .step p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── FEATURES ── */
+    .features-section { background: var(--bg2); }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-top: 64px;
+    }
+
+    .feature-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 32px;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--orange-glow), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(247,147,26,0.25);
+      transform: translateY(-4px);
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+    }
+
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: var(--orange-dim);
+      border: 1px solid rgba(247,147,26,0.2);
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
     }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      background: #181818;
-      border-radius: 24px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
-      padding: 48px 32px 40px 32px;
-      border: 1px solid #222;
-    }
-    h1 {
-      text-align: center;
-      font-size: 2.8em;
-      margin-bottom: 0.2em;
-      color: #FFD700;
-      letter-spacing: 2px;
-      font-family: 'Montserrat', 'Roboto', sans-serif;
-      text-shadow: 0 2px 16px #FFD70044;
-    }
-    .subtitle {
-      text-align: center;
-      font-size: 1.25em;
-      color: #FFD700;
-      margin-bottom: 2em;
+
+    .feature-card h3 {
+      font-size: 1.05rem;
       font-weight: 700;
-      text-shadow: 0 2px 8px #FFD70022;
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
     }
-    .features {
+
+    .feature-card p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── COMMANDS ── */
+    .commands-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 56px;
+    }
+
+    .cmd-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
+      gap: 16px;
+      align-items: flex-start;
+      transition: all 0.2s;
+    }
+
+    .cmd-card:hover {
+      border-color: rgba(247,147,26,0.2);
+      background: var(--bg3);    }
+
+    .cmd-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--orange);
+      background: var(--orange-dim);
+      border: 1px solid rgba(247,147,26,0.2);
+      padding: 4px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .cmd-desc {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.5;
+      padding-top: 3px;
+    }
+
+    /* ── STATS ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 2px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      margin-top: 64px;
+    }
+
+    .stat {
+      background: var(--bg2);
+      padding: 40px 32px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--orange);
+      letter-spacing: -2px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* ── CTA SECTION ── */
+    .cta-section {
+      text-align: center;
+    }
+
+    .cta-box {
+      background: linear-gradient(135deg, rgba(247,147,26,0.08) 0%, rgba(0,230,118,0.04) 100%);
+      border: 1px solid rgba(247,147,26,0.2);
+      border-radius: 28px;
+      padding: 80px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-box::before {
+      content: '₿';
+      position: absolute;
+      font-size: 400px;
+      color: rgba(247,147,26,0.03);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: 900;
+      pointer-events: none;
+      line-height: 1;
+    }
+
+    .cta-box h2 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+
+    .cta-box p {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    .social-links {
+      display: flex;
+      gap: 16px;
       justify-content: center;
-      margin-bottom: 2em;
+      margin-top: 40px;
+      flex-wrap: wrap;
     }
-    .feature-card {
-      background: #222;
-      border-radius: 16px;
-      padding: 24px 18px;
-      width: 170px;
-      box-shadow: 0 2px 12px #FFD70022;
-      text-align: center;
-      transition: transform 0.2s, box-shadow 0.2s;
-      border: 1px solid #FFD70055;
+
+    .social-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      transition: all 0.2s;
     }
-    .feature-card:hover {
-      transform: translateY(-8px) scale(1.05);
-      box-shadow: 0 8px 32px #FFD70044;
+
+    .social-link:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.04);
     }
-    .feature-icon {
-      font-size: 2.2em;
-      margin-bottom: 0.5em;
-      color: #FFD700;
-      text-shadow: 0 2px 8px #FFD70044;
+
+    .social-link svg { flex-shrink: 0; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: gap;
+      gap: 16px;
     }
-    .telegram-info {
-      background: #222;
-      border-radius: 16px;
-      padding: 24px 18px;
-      box-shadow: 0 2px 12px #FFD70022;
-      border: 1px solid #FFD70055;
-      margin-top: 2em;
-      text-align: center;
-      font-size: 1.15em;
-      color: #FFD700;
+
+    .footer-logo {
+      font-family: 'Space Mono', monospace;
       font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--orange);
     }
-    .telegram-icon {
-      font-size: 2em;
-      color: #FFD700;
-      margin-bottom: 0.5em;
-      display: block;
+
+    .footer-note {
+      font-size: 0.78rem;
+      color: var(--muted);
     }
-    .footer {
-      text-align: center;
-      margin-top: 2em;
-      color: #FFD700;
-      font-size: 1em;
-      opacity: 0.8;
-      font-weight: 700;
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .nav-links a:not(.cta) { display: none; }
+      footer { flex-direction: column; text-align: center; padding: 32px 20px; }
+    }
+
+    /* ── CHART ANIMATION ── */
+    .chart-wrap {
+      width: 100%;
+      max-width: 700px;
+      margin: 64px auto 0;
+      position: relative;
+    }
+
+    .chart-line {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: draw 2.5s ease forwards 0.5s;
+    }
+
+    @keyframes draw {
+      to { stroke-dashoffset: 0; }
     }
   </style>
 </head>
 <body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <span class="dot"></span>
+    BTC Predictor
+  </a>
+  <div class="nav-links">
+    <a href="#how">How It Works</a>
+    <a href="#features">Features</a>
+    <a href="#commands">Commands</a>
+    <a href="https://t.me/btc_predictorTG" target="_blank" class="cta">Launch Bot →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-glow-2"></div>
+
+  <div class="badge">
+    <span class="live-dot"></span>
+    Live on Polymarket
+  </div>
+
+  <h1>Trade BTC<br /><span>5-Minute Markets</span><br />On Autopilot</h1>
+
+  <p class="hero-sub">
+    An intelligent Telegram bot that reads BTC momentum, filters high-confidence signals, and auto-trades Polymarket prediction markets — so you don't have to.
+  </p>
+
+  <div class="hero-buttons">
+    <a href="https://t.me/btc_predictorTG" target="_blank" class="btn btn-primary">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.069l-2.025 9.539c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.085 14.42l-2.95-.924c-.641-.203-.654-.641.136-.949l11.532-4.448c.537-.194 1.006.131.759.97z"/></svg>
+      Start on Telegram
+    </a>
+    <a href="https://x.com/btcpredictorbot" target="_blank" class="btn btn-secondary">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      Follow on X
+    </a>
+  </div>
+
+  <!-- Mini chart -->
+  <div class="chart-wrap">
+    <svg viewBox="0 0 700 160" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;opacity:0.6">
+      <defs>
+        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f7931a" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="#f7931a" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="M0 130 L40 120 L80 125 L120 105 L160 110 L200 90 L240 95 L280 70 L320 80 L360 55 L400 65 L440 40 L480 50 L520 30 L560 45 L600 20 L640 30 L700 10" 
+            stroke="#f7931a" stroke-width="2.5" fill="none" class="chart-line"/>
+      <path d="M0 130 L40 120 L80 125 L120 105 L160 110 L200 90 L240 95 L280 70 L320 80 L360 55 L400 65 L440 40 L480 50 L520 30 L560 45 L600 20 L640 30 L700 10 L700 160 L0 160 Z"
+            fill="url(#chartGrad)"/>
+      <!-- Trade markers -->
+      <circle cx="200" cy="90" r="5" fill="#00e676" opacity="0.9"/>
+      <circle cx="360" cy="55" r="5" fill="#00e676" opacity="0.9"/>
+      <circle cx="520" cy="30" r="5" fill="#00e676" opacity="0.9"/>
+    </svg>
+  </div>
+
+  <!-- Ticker -->
+  <div class="ticker-wrap" style="margin-top:48px">
+    <div class="ticker">
+      <div class="ticker-item">BTC/USD <span class="up">↑ +2.4%</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">5m Confidence <span class="up">72%</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Signal <span class="up">BUY YES</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Edge <span class="up">+3.1%</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Trend Lock <span class="up">CLEAR</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Circuit Breaker <span class="up">OPEN</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <!-- duplicate for seamless loop -->
+      <div class="ticker-item">BTC/USD <span class="up">↑ +2.4%</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">5m Confidence <span class="up">72%</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Signal <span class="up">BUY YES</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Edge <span class="up">+3.1%</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Trend Lock <span class="up">CLEAR</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+      <div class="ticker-item">Circuit Breaker <span class="up">OPEN</span></div>
+      <div class="ticker-item ticker-sep">·</div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section style="padding:0 24px 80px">
   <div class="container">
-    <h1>BTC Predictor Bot</h1>
-    <div class="subtitle">Automatically bets on the BTC prediction market (5 min up/down) with built-in VPN for seamless transactions.</div>
-    <div class="features">
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-num">5m</div>
+        <div class="stat-label">Prediction Window</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">24/7</div>
+        <div class="stat-label">Fully Automated</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">65%+</div>
+        <div class="stat-label">Min Signal Confidence</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">100%</div>
+        <div class="stat-label">Non-Custodial</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Three steps.<br />Start trading.</h2>
+    <p class="section-sub">The bot handles everything from signal generation to order execution. You set the risk, it does the work.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01 —</div>
+        <div class="step-icon">⚡</div>
+        <h3>Connect Your Wallet</h3>
+        <p>Send your private key directly to the bot. It never leaves the server. Configure your wallet type and funded address in seconds.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02 —</div>
+        <div class="step-icon">🎯</div>
+        <h3>Set Your Risk</h3>
+        <p>Define your max bet, take-profit, stop-loss, and confidence thresholds. The bot respects your limits on every single trade.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03 —</div>
+        <div class="step-icon">🤖</div>
+        <h3>Let It Run</h3>
+        <p>Type /starttrade. The bot discovers markets, reads BTC momentum, filters signals, and places orders automatically around the clock.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04 —</div>
+        <div class="step-icon">📊</div>
+        <h3>Monitor & Tune</h3>
+        <p>Check /status for live signals, /pnl for stats, and adjust filters anytime. Full visibility into every decision the bot makes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features-section" id="features">
+  <div class="container">
+    <div class="section-label">Built Different</div>
+    <h2 class="section-title">Smart guards.<br />Real edge.</h2>
+    <p class="section-sub">Every entry is run through multiple filters before a single dollar moves. Most bots trade noise. This one doesn't.</p>
+
+    <div class="features-grid">
       <div class="feature-card">
-        <div class="feature-icon">🤖</div>
-        <div>Auto-Bets on BTC<br>Prediction Market</div>
+        <div class="feature-icon">🧠</div>
+        <h3>Confidence Filter</h3>
+        <p>Only executes when the signal crosses your minimum confidence threshold. Set it at 65%, 70%, 75% — your call. Weak signals get skipped entirely.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📐</div>
+        <h3>Edge Filter</h3>
+        <p>Checks that net expected return clears the cost buffer before entry. Filters out "technically bullish but barely" setups that eat fees and lose.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">⏱️</div>
-        <div>5-Minute Up/Down<br>Betting Cycles</div>
+        <h3>Resolution Timing</h3>
+        <p>Tracks seconds remaining in each 5-minute slot. Skips new entries when it's too close to expiry — no more entering trades with 30 seconds left.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📉</div>
+        <h3>Macro Trend Lock</h3>
+        <p>Won't fight a strong 5-hour BTC trend. If the macro is moving hard one direction, the bot stops trying to call reversals. Trade with the tape.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Circuit Breaker</h3>
+        <p>Automatic pause after hitting daily loss limits or consecutive loss streaks. Configurable multipliers and cooldown periods. Protects your capital on bad days.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🛡️</div>
-        <div>Built-in VPN<br>Seamless Transactions</div>
+        <h3>DCA Guards</h3>
+        <p>Blocks averaging into a losing position when the token has already dropped too far from your cost basis. No spiraling deeper into bad trades.</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <div>Fast & Secure</div>
-      </div>
-    </div>
-    <div class="telegram-info">
-      <span class="telegram-icon">&#128241;</span>
-      <strong>Instructions & Support:</strong><br>
-      All usage instructions and bot support are provided via Telegram.<br>
-      <a href="https://t.me/btc_predictorTG" target="_blank" style="display:inline-block;margin-top:18px;padding:12px 28px;background:#FFD700;color:#111;font-weight:700;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px #FFD70044;transition:background 0.2s;">Join Telegram</a>
-    </div>
-    <div class="footer">
-      &copy; 2026 BTC Predictor Bot &mdash; All rights reserved.
     </div>
   </div>
-  <!-- No chart, clean UI -->
+</section>
+
+<!-- COMMANDS -->
+<section id="commands">
+  <div class="container">
+    <div class="section-label">Command Reference</div>
+    <h2 class="section-title">Everything at<br />your fingertips.</h2>
+    <p class="section-sub">Full control from Telegram. Every parameter is adjustable in real time — no restarts, no config files.</p>
+
+    <div class="commands-grid">
+      <div class="cmd-card">
+        <span class="cmd-tag">/start</span>
+        <span class="cmd-desc">Begin your private session</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setkey</span>
+        <span class="cmd-desc">Connect your wallet private key</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setmax 20</span>
+        <span class="cmd-desc">Set max bet size in USD</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setstops 8 4</span>
+        <span class="cmd-desc">Take profit % and stop loss %</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/starttrade</span>
+        <span class="cmd-desc">Start the auto trading loop</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/stoptrade</span>
+        <span class="cmd-desc">Pause all trading activity</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/status</span>
+        <span class="cmd-desc">Live signal, confidence & position</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/pnl</span>
+        <span class="cmd-desc">Your win/loss record and P&amp;L</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/myconfig</span>
+        <span class="cmd-desc">All current settings in one view</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setminconf 65</span>
+        <span class="cmd-desc">Min confidence to enter a trade</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setminedge 1</span>
+        <span class="cmd-desc">Min net expected edge %</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setresolvebuf 90</span>
+        <span class="cmd-desc">Skip entries if slot ending soon</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/settrendlock 1.5</span>
+        <span class="cmd-desc">Block trades fighting 5h trend</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/setcb 2 3 30</span>
+        <span class="cmd-desc">Circuit breaker: mult / consec / cooldown</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/cbstatus</span>
+        <span class="cmd-desc">Live circuit breaker state</span>
+      </div>
+      <div class="cmd-card">
+        <span class="cmd-tag">/runonce</span>
+        <span class="cmd-desc">Run a single manual cycle</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-box">
+      <div class="badge" style="margin:0 auto 28px">
+        <span class="live-dot"></span>
+        Free to Use
+      </div>
+      <h2>Ready to run it?</h2>
+      <p>Open the bot on Telegram, connect your wallet, set your risk, and let it trade. Support is live in the community.</p>
+      <div class="hero-buttons">
+        <a href="https://t.me/btc_predictorTG" target="_blank" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.069l-2.025 9.539c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.085 14.42l-2.95-.924c-.641-.203-.654-.641.136-.949l11.532-4.448c.537-.194 1.006.131.759.97z"/></svg>
+          Launch Bot on Telegram
+        </a>
+      </div>
+
+      <div class="social-links">
+        <a href="https://t.me/btc_predictorTG" target="_blank" class="social-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.069l-2.025 9.539c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.085 14.42l-2.95-.924c-.641-.203-.654-.641.136-.949l11.532-4.448c.537-.194 1.006.131.759.97z"/></svg>
+          Telegram Community
+        </a>
+        <a href="https://x.com/btcpredictorbot" target="_blank" class="social-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          @btcpredictorbot on X
+        </a>
+        <a href="https://t.me/btc_predictorTG" target="_blank" class="social-link" style="color:var(--green);border-color:rgba(0,230,118,0.2)">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block"></span>
+          Support in Telegram
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">BTC Predictor Bot</div>
+  <div class="footer-note">Not financial advice. Trade responsibly.</div>
+  <div class="footer-note">
+    <a href="https://t.me/btc_predictorTG" target="_blank" style="color:var(--muted);text-decoration:none;margin-right:16px">Telegram</a>
+    <a href="https://x.com/btcpredictorbot" target="_blank" style="color:var(--muted);text-decoration:none">X / Twitter</a>
+  </div>
+</footer>
+
 </body>
 </html>
