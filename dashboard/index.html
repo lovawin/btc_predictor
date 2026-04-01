@@ -537,51 +537,43 @@
     </div>
 
     <!-- Eligible Token Holders -->
-    <div class="panel-section">
+    <div class="panel-section" style="flex:1;min-height:200px;display:flex;flex-direction:column;overflow:hidden">
       <div class="panel-title">
-        <span>🏆 Top 3 Eligible Holders</span>
+        <span>🏆 Top 20 Eligible Holders</span>
         <span style="font-size:10px;color:var(--text-dim)">GkW5Gue...Rpump</span>
       </div>
-      <div class="holders-list" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-        <!-- #1 -->
-        <div style="background:linear-gradient(90deg, rgba(255,215,0,0.15), transparent); border:1px solid rgba(255,215,0,0.3); border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
-          <div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg, #FFD700, #FFA500);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#000;">1</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">DtSu...j3xbw</div>
-            <div style="font-size:9px;color:var(--text-dim);">419.3M tokens</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--green);">$4,549.94</div>
-            <div style="font-size:8px;color:var(--green);">✓ Eligible</div>
-          </div>
-        </div>
-
-        <!-- #2 -->
-        <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);">2</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">8USq...U7TsCC</div>
-            <div style="font-size:9px;color:var(--text-dim);">32.8M tokens</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--text);">$356.38</div>
-            <div style="font-size:8px;color:var(--green);">✓ Eligible</div>
-          </div>
-        </div>
-
-        <!-- #3 -->
-        <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);">3</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">5vbq...T5rXX</div>
-            <div style="font-size:9px;color:var(--text-dim);">29.0M tokens</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--text);">$314.86</div>
-            <div style="font-size:8px;color:var(--green);">✓ Eligible</div>
-          </div>
-        </div>
-
+      <div class="holders-table" style="overflow-y:auto;flex:1;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead style="position:sticky;top:0;background:var(--panel);z-index:1;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="text-align:left;padding:6px 4px;color:var(--text-dim);font-weight:500;">#</th>
+              <th style="text-align:left;padding:6px 4px;color:var(--text-dim);font-weight:500;">Wallet</th>
+              <th style="text-align:right;padding:6px 4px;color:var(--text-dim);font-weight:500;">USD</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(247,147,26,0.08);"><td style="padding:5px 4px;color:var(--orange);font-weight:700;">1</td><td style="padding:5px 4px;color:var(--text);">DtSu...j3xbw</td><td style="padding:5px 4px;color:var(--orange);text-align:right;font-weight:600;">$4,549.94</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">2</td><td style="padding:5px 4px;color:var(--text);">8USq...U7TsCC</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$356.38</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">3</td><td style="padding:5px 4px;color:var(--text);">5vbq...T5rXX</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$314.86</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">4</td><td style="padding:5px 4px;color:var(--text);">28hv...YU4KC</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$235.87</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">5</td><td style="padding:5px 4px;color:var(--text);">GSdN...aY4S</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$217.96</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">6</td><td style="padding:5px 4px;color:var(--text);">FKa4...nZGP</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$217.00</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">7</td><td style="padding:5px 4px;color:var(--text);">Hzuc...ZeoJ</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$208.91</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">8</td><td style="padding:5px 4px;color:var(--text);">E2c7...4e95</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$183.92</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">9</td><td style="padding:5px 4px;color:var(--text);">3RV4...iiAC</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$183.51</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">10</td><td style="padding:5px 4px;color:var(--text);">3SzJ...z8c4</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$183.14</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">11</td><td style="padding:5px 4px;color:var(--text);">7PmJ...KQRa</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$146.48</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">12</td><td style="padding:5px 4px;color:var(--text);">6b1u...sciu</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$135.42</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">13</td><td style="padding:5px 4px;color:var(--text);">2xtM...B6R</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$131.23</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">14</td><td style="padding:5px 4px;color:var(--text);">3f9f...Y4uf</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$129.91</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">15</td><td style="padding:5px 4px;color:var(--text);">8shD...46Q6</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$129.09</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">16</td><td style="padding:5px 4px;color:var(--text);">4uXc...4PWj</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$123.94</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">17</td><td style="padding:5px 4px;color:var(--text);">H15A...Cdi9</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$121.45</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">18</td><td style="padding:5px 4px;color:var(--text);">BbKG...wM2</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$115.97</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">19</td><td style="padding:5px 4px;color:var(--text);">2nna...xdRZ</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$115.58</td></tr>
+            <tr><td style="padding:5px 4px;color:var(--text-dim);">20</td><td style="padding:5px 4px;color:var(--text);">J5rd...vkTQ</td><td style="padding:5px 4px;color:var(--text);text-align:right;">$115.07</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
